@@ -112,8 +112,12 @@ namespace Plugin {
             Config()
                 : Core::JSON::Container()
                 , OutOfProcess(true)
+                , RegisterPowerKey(true)
+                , ControlClients(true)
             {
                 Add(_T("outofprocess"), &OutOfProcess);
+                Add(_T("registerpowerkey"), &RegisterPowerKey);
+                Add(_T("controlclients"), &ControlClients);
             }
             ~Config()
             {
@@ -121,6 +125,8 @@ namespace Plugin {
 
         public:
             Core::JSON::Boolean OutOfProcess;
+            Core::JSON::Boolean RegisterPowerKey;
+            Core::JSON::Boolean ControlClients;
         };
 
         typedef std::map<const string, Entry> Clients;
@@ -164,6 +170,8 @@ namespace Plugin {
             , _clients()
             , _power(nullptr)
             , _sink(this)
+            , _registerPowerKey(true)
+            , _controlClients(true)
         {
             RegisterAll();
         }
@@ -231,6 +239,8 @@ namespace Plugin {
         Clients _clients;
         Exchange::IPower* _power;
         Core::Sink<Notification> _sink;
+        bool _registerPowerKey;
+        bool _controlClients;
     };
 } //namespace Plugin
 } //namespace WPEFramework

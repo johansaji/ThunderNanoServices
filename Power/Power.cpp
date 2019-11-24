@@ -23,11 +23,19 @@ namespace Plugin {
         _power = Core::ServiceAdministrator::Instance().Instantiate<Exchange::IPower>(Core::Library(), _T("PowerImplementation"), static_cast<uint32_t>(~0));
 
         if (_power != nullptr) {
+            Config config;
+
+            config.FromString(_service->ConfigLine());
+            _registerPowerKey = config.RegisterPowerKey.Value();
+            _controlClients = config.ControlClients.Value();
+
+            if (_registerPowerKey) {
             PluginHost::VirtualInput* keyHandler(PluginHost::InputHandler::Handler());
 
             ASSERT(keyHandler != nullptr);
 
             keyHandler->Register(&_sink, KEY_POWER);
+            }
 
             // Receive all plugin information on state changes.
             _service->Register(&_sink);
@@ -55,11 +63,13 @@ namespace Plugin {
         // Remove all registered clients
         _clients.clear();
 
-        // Also we are nolonger interested in the powerkey events, we have been requested to shut down our services!
-        PluginHost::VirtualInput* keyHandler(PluginHost::InputHandler::Handler());
+        if (_registerPowerKey) {
+            // Also we are nolonger interested in the powerkey events, we have been requested to shut down our services!
+            PluginHost::VirtualInput* keyHandler(PluginHost::InputHandler::Handler());
 
-        ASSERT(keyHandler != nullptr);
-        keyHandler->Unregister(&_sink, KEY_POWER);
+            ASSERT(keyHandler != nullptr);
+            keyHandler->Unregister(&_sink, KEY_POWER);
+        }
 
         _power->Unregister(&_sink);
 
@@ -182,30 +192,32 @@ namespace Plugin {
 
     void Power::ControlClients(Exchange::IPower::PCState state)
     {
-        Clients::iterator client(_clients.begin());
+        if (_controlClients) {
+            Clients::iterator client(_clients.begin());
 
-        switch (state) {
-        case Exchange::IPower::PCState::On:
-            TRACE(Trace::Information, (_T("Change state to RESUME for")));
-            while (client != _clients.end()) {
-                client->second.Resume();
-                client++;
+            switch (state) {
+                case Exchange::IPower::PCState::On:
+                    TRACE(Trace::Information, (_T("Change state to RESUME for")));
+                    while (client != _clients.end()) {
+                        client->second.Resume();
+                        client++;
+                    }
+                    //Nothing to be done
+                    break;
+                case Exchange::IPower::PCState::ActiveStandby:
+                case Exchange::IPower::PCState::PassiveStandby:
+                case Exchange::IPower::PCState::SuspendToRAM:
+                case Exchange::IPower::PCState::Hibernate:
+                case Exchange::IPower::PCState::PowerOff:
+                    while (client != _clients.end()) {
+                        client->second.Suspend();
+                        client++;
+                    }
+                    break;
+                default:
+                    ASSERT(false);
+                    break;
             }
-            //Nothing to be done
-            break;
-        case Exchange::IPower::PCState::ActiveStandby:
-        case Exchange::IPower::PCState::PassiveStandby:
-        case Exchange::IPower::PCState::SuspendToRAM:
-        case Exchange::IPower::PCState::Hibernate:
-        case Exchange::IPower::PCState::PowerOff:
-            while (client != _clients.end()) {
-                client->second.Suspend();
-                client++;
-            }
-            break;
-        default:
-            ASSERT(false);
-            break;
         }
     }
 
